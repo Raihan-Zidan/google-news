@@ -1,55 +1,33 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import requests
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 CORS(app)
 
-def scrape_google_news(query):
-    url = f"https://www.google.com/search?q={query}&tbm=nws"
+def scrape_google_images(query, start=0):
+    url = f"https://www.google.com/search?q={query}&tbm=isch&start={start}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    }
 
-    # Start Playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto(url)
-        page.wait_for_load_state("networkidle")  # Tunggu sampai semua elemen termuat
-        html = page.content()
-        browser.close()
-
-    soup = BeautifulSoup(html, "html.parser")
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
 
     results = []
-    for article in soup.select(".SoaBEf"):
-        title_elem = article.select_one("div.MBeuO")
-        title = title_elem.text if title_elem else "No Title"
-        link = article.select_one("a")["href"] if article.select_one("a") else "#"
-        
-        source_elem = article.select_one(".MgUUmf span")
-        source = source_elem.text if source_elem else "Unknown Source"
-
-        time_elem = article.select_one(".LfVVr")
-        time = time_elem.text if time_elem else "Unknown Time"
-
-        # Ambil gambar setelah JS render
-        img_elem = article.select_one("img")
-        thumbnail = img_elem["src"] if img_elem else "https://via.placeholder.com/150"
-
-        results.append({
-            "title": title,
-            "link": link,
-            "source": source,
-            "time": time,
-            "thumbnail": thumbnail
-        })
+    for img in soup.select("img"):
+        img_url = img["src"] if "src" in img.attrs else img.get("data-src", "")
+        if img_url.startswith("http"):  # Hindari gambar yang bukan URL valid
+            results.append({"image": img_url})
 
     return results
 
 @app.route("/scrape", methods=["GET"])
 def scrape():
-    query = request.args.get("query", "berita terbaru")
-    data = scrape_google_news(query)
+    query = request.args.get("query", "random")
+    start = request.args.get("start", 0, type=int)
+    data = scrape_google_images(query, start)
     return jsonify(data)
 
 if __name__ == "__main__":
