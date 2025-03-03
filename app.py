@@ -1,18 +1,24 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from bs4 import BeautifulSoup
-import requests
+from playwright.sync_api import sync_playwright
 
 app = Flask(__name__)
 CORS(app)
 
 def scrape_google_news(query):
     url = f"https://www.google.com/search?q={query}&tbm=nws"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, seperti Gecko) Chrome/110.0.0.0 Safari/537.36",
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Start Playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(url)
+        page.wait_for_load_state("networkidle")  # Tunggu sampai semua elemen termuat
+        html = page.content()
+        browser.close()
+
+    soup = BeautifulSoup(html, "html.parser")
 
     results = []
     for article in soup.select(".SoaBEf"):
@@ -26,7 +32,7 @@ def scrape_google_news(query):
         time_elem = article.select_one(".LfVVr")
         time = time_elem.text if time_elem else "Unknown Time"
 
-        # Ambil gambar thumbnail
+        # Ambil gambar setelah JS render
         img_elem = article.select_one("img")
         thumbnail = img_elem["src"] if img_elem else "https://via.placeholder.com/150"
 
