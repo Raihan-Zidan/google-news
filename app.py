@@ -19,12 +19,24 @@ def scrape_google_news(query):
         title_elem = article.select_one("div.MBeuO")
         title = title_elem.text if title_elem else "No Title"
         link = article.select_one("a")["href"] if article.select_one("a") else "#"
-        source_elem = article.select_one(".SVJrMe")
+        
+        source_elem = article.select_one(".MgUUmf span")
         source = source_elem.text if source_elem else "Unknown Source"
+
         time_elem = article.select_one(".LfVVr")
         time = time_elem.text if time_elem else "Unknown Time"
 
-        results.append({"title": title, "link": link, "source": source, "time": time})
+        # Ambil gambar thumbnail
+        img_elem = article.select_one("img")
+        thumbnail = img_elem["src"] if img_elem else "https://via.placeholder.com/150"
+
+        results.append({
+            "title": title,
+            "link": link,
+            "source": source,
+            "time": time,
+            "thumbnail": thumbnail
+        })
 
     return results
 
